@@ -10,5 +10,7 @@ crate-type = ["cdylib", "staticlib"]
 flutter_rust_bridge = "=2.0.0-dev.33"
 windows-capture = { path = "../packages/windows-capture" }
 anyhow = "1.0"
-
-[workspace]
+half = "2.4.1"
+glam = "0.27.0"
+libavif-sys = { version = "0.16.0", default-features = false, features = ["codec-aom"] }
+windows = { version = "0.56.0", features = ["Win32_Graphics_Dxgi_Common", "Win32_Graphics_Gdi"] }
