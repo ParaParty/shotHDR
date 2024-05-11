@@ -1,0 +1,3 @@
+[submodule "packages/windows-capture"]
+	path = packages/windows-capture
+	url = https://github.com/xkeyC/windows-capture.git
