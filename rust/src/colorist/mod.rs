@@ -28,12 +28,12 @@ pub fn float_to_unorm(f: &[f32]) -> (RGBA, u16) {
     let scale = SDR_WHITE / REC2100_MAX;
     let linear_srgb = sc_rgb * scale;
 
-    let matrix = Mat3::from_cols_array(&[
+    let srgb_to_bt2100 = Mat3::from_cols_array(&[
         0.627409, 0.0691248, 0.0164234,
         0.32926, 0.919549, 0.0880478,
         0.0432719, 0.0113208, 0.895617
     ]);
-    let linear_bt2100 = matrix.mul_vec3(linear_srgb).clamp(Vec3::splat(0f32), Vec3::splat(1f32));
+    let linear_bt2100 = srgb_to_bt2100.mul_vec3(linear_srgb).clamp(Vec3::splat(0f32), Vec3::splat(1f32));
 
     let coeff = Vec3::new(0.2627, 0.6780, 0.0593);
     let brightness = (linear_bt2100.dot(coeff) * 10000f32).round() as u16;
@@ -65,20 +65,16 @@ pub fn float_to_unorm(f: &[f32]) -> (RGBA, u16) {
 /// For now display is not actually used.
 /// It may be useful in the future.
 pub fn fill_avif_image(data: Vec<f16>, display: &Dxgi::DXGI_OUTPUT_DESC1, alpha: bool, avif: &mut avifImage) -> avifResult {
-    assert_eq!(data.len(), avif.width as usize * avif.height as usize * 4);
+    let num_pixel = avif.width as usize * avif.height as usize;
+    assert_eq!(data.len(), num_pixel * 4);
 
     let mut f32_buf = vec![0.0; data.len()];
     data.convert_to_f32_slice(&mut f32_buf);
 
-    let (mut u16_buf, max_cll) = f32_buf
-        .chunks(4)
-        .fold((Vec::with_capacity(data.len()), 0),
-              |(mut u16_buf, max_cll), x| {
-                  let (pixel, cll) = float_to_unorm(x);
-                  u16_buf.push(pixel);
-
-                  (u16_buf, max(max_cll, cll))
-              });
+    let (mut u16_buf, brightness) : (Vec<RGBA>, Vec<u16>) = f32_buf.chunks_exact(4).map(float_to_unorm).unzip();
+    let max_cll = *brightness.iter().max().unwrap();
+    let sum: u64 = brightness.iter().map(|x| *x as u64).sum();
+    let pall = ((sum as f64) / (num_pixel as f64)).round() as u16;
 
     let rgb = avifRGBImage {
         width: avif.width,
@@ -101,7 +97,7 @@ pub fn fill_avif_image(data: Vec<f16>, display: &Dxgi::DXGI_OUTPUT_DESC1, alpha:
     avif.matrixCoefficients = AVIF_MATRIX_COEFFICIENTS_BT2020_NCL as avifMatrixCoefficients;
     avif.clli = avifContentLightLevelInformationBox {
         maxCLL: max_cll,
-        maxPALL: 0,
+        maxPALL: pall,
     };
 
     // TODO: fill avif.mdcv once supported by libavif
