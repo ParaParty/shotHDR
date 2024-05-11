@@ -1,0 +1,45 @@
+name: shot_hdr
+description: "A new Flutter project."
+publish_to: 'none'
+
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.4 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Core dependencies
+  flutter_rust_bridge: 2.0.0-dev.33
+  rust_lib_shot_hdr:
+    path: rust_builder
+  flutter_riverpod: ^2.4.10
+  riverpod_annotation: ^2.3.4
+  freezed: ^2.5.2
+  freezed_annotation: ^2.4.1
+  flutter_hooks: ^0.20.5
+  hooks_riverpod: ^2.4.10
+  json_annotation: ^4.8.1
+  # UI
+  fluent_ui: ^4.8.6
+  # win32 Tools
+  window_manager: ^0.3.2
+  tray_manager: ^0.2.2
+  flutter_acrylic: ^1.1.0
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  ffigen: ^12.0.0
+  integration_test:
+    sdk: flutter
+
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/
