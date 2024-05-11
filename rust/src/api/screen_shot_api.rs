@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use half::f16;
-use libavif_sys::{AVIF_CHROMA_SAMPLE_POSITION_UNKNOWN, AVIF_FALSE, AVIF_PIXEL_FORMAT_YUV420, AVIF_RANGE_LIMITED, AVIF_RESULT_OK, avifBool, avifEncoderCreate, avifEncoderWrite, avifImage, avifRWData, avifRWDataFree};
+use libavif_sys::{AVIF_CHROMA_SAMPLE_POSITION_UNKNOWN, AVIF_FALSE, AVIF_PIXEL_FORMAT_YUV420, AVIF_RANGE_FULL, AVIF_RANGE_LIMITED, AVIF_RESULT_OK, avifBool, avifEncoderCreate, avifEncoderWrite, avifImage, avifRWData, avifRWDataFree};
 use windows::Win32::Graphics::Dxgi;
 
 use windows_capture::capture::GraphicsCaptureApiHandler;
@@ -111,7 +111,7 @@ fn _raw_buffer_to_avif(buf: Vec<u8>, frame_width: u32, frame_height: u32) -> any
     avif.height = frame_height;
     avif.depth = 10;
     avif.yuvFormat = AVIF_PIXEL_FORMAT_YUV420;
-    avif.yuvRange = AVIF_RANGE_LIMITED;
+    avif.yuvRange = AVIF_RANGE_FULL;
     avif.yuvChromaSamplePosition = AVIF_CHROMA_SAMPLE_POSITION_UNKNOWN;
     avif.alphaPremultiplied = AVIF_FALSE as avifBool;
     let result = colorist::fill_avif_image(data, &display_desc, false, &mut avif);
