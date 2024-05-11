@@ -48,13 +48,19 @@ impl CstDecode<String> for *mut wire_cst_list_prim_u_8_strict {
         String::from_utf8(vec).unwrap()
     }
 }
+impl CstDecode<crate::api::screen_shot_api::CaptureResult> for *mut wire_cst_capture_result {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    fn cst_decode(self) -> crate::api::screen_shot_api::CaptureResult {
+        let wrap = unsafe { flutter_rust_bridge::for_generated::box_from_leak_ptr(self) };
+        CstDecode::<crate::api::screen_shot_api::CaptureResult>::cst_decode(*wrap).into()
+    }
+}
 impl CstDecode<crate::api::screen_shot_api::CaptureResult> for wire_cst_capture_result {
     // Codec=Cst (C-struct based), see doc to use other codecs
     fn cst_decode(self) -> crate::api::screen_shot_api::CaptureResult {
         crate::api::screen_shot_api::CaptureResult {
             mode: self.mode.cst_decode(),
-            avif_data: self.avif_data.cst_decode(),
-            png_data: self.png_data.cst_decode(),
+            raw_data: self.raw_data.cst_decode(),
             frame_width: self.frame_width.cst_decode(),
             frame_height: self.frame_height.cst_decode(),
         }
@@ -73,8 +79,7 @@ impl NewWithNullPtr for wire_cst_capture_result {
     fn new_with_null_ptr() -> Self {
         Self {
             mode: core::ptr::null_mut(),
-            avif_data: core::ptr::null_mut(),
-            png_data: core::ptr::null_mut(),
+            raw_data: core::ptr::null_mut(),
             frame_width: Default::default(),
             frame_height: Default::default(),
         }
@@ -84,6 +89,14 @@ impl Default for wire_cst_capture_result {
     fn default() -> Self {
         Self::new_with_null_ptr()
     }
+}
+
+#[no_mangle]
+pub extern "C" fn frbgen_shot_hdr_wire_capture_result_to_avif(
+    port_: i64,
+    that: *mut wire_cst_capture_result,
+) {
+    wire_capture_result_to_avif_impl(port_, that)
 }
 
 #[no_mangle]
@@ -97,6 +110,14 @@ pub extern "C" fn frbgen_shot_hdr_wire_take_full_screen(
 #[no_mangle]
 pub extern "C" fn frbgen_shot_hdr_wire_init_app(port_: i64) {
     wire_init_app_impl(port_)
+}
+
+#[no_mangle]
+pub extern "C" fn frbgen_shot_hdr_cst_new_box_autoadd_capture_result(
+) -> *mut wire_cst_capture_result {
+    flutter_rust_bridge::for_generated::new_leak_box_ptr(
+        wire_cst_capture_result::new_with_null_ptr(),
+    )
 }
 
 #[no_mangle]
@@ -114,8 +135,7 @@ pub extern "C" fn frbgen_shot_hdr_cst_new_list_prim_u_8_strict(
 #[derive(Clone, Copy)]
 pub struct wire_cst_capture_result {
     mode: *mut wire_cst_list_prim_u_8_strict,
-    avif_data: *mut wire_cst_list_prim_u_8_strict,
-    png_data: *mut wire_cst_list_prim_u_8_strict,
+    raw_data: *mut wire_cst_list_prim_u_8_strict,
     frame_width: u32,
     frame_height: u32,
 }

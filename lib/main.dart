@@ -1,3 +1,7 @@
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter_acrylic/flutter_acrylic.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -22,6 +26,7 @@ Future<void> main() async {
       'assets/tray_icon.ico',
     );
     await Window.initialize();
+    await Window.hideWindowControls();
     await Window.setEffect(effect: WindowEffect.mica);
   });
   await RustLib.init();
@@ -53,6 +58,10 @@ class _MainAppUIState extends ConsumerState<MainAppUI>
 
   bool isWindowForced = true;
 
+  int step = 0;
+
+  Uint8List? avifData;
+
   @override
   Widget build(BuildContext context) {
     return FluentApp(
@@ -67,24 +76,54 @@ class _MainAppUIState extends ConsumerState<MainAppUI>
         color: isWindowForced ? null : const Color.fromRGBO(32, 32, 32, 1),
         child: makeDefaultPage(
           context,
-          title: "shotHDR",
+          title: "",
+          titleRow: Row(
+            children: [
+              const Expanded(child: Text("shotHDR [DEMO]")),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  FilledButton(
+                    onPressed: _onTakeScreen,
+                    child: const Padding(
+                      padding: EdgeInsets.all(6),
+                      child: Icon(FluentIcons.camera),
+                    ),
+                  ),
+                  if (avifData != null) ...[
+                    const SizedBox(width: 12),
+                    Button(
+                        onPressed: _onSave,
+                        child: const Padding(
+                          padding: EdgeInsets.all(6),
+                          child: Icon(FluentIcons.save),
+                        )),
+                  ],
+                ],
+              ),
+              SizedBox(width: 168),
+            ],
+          ),
           content: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.only(left: 12, right: 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+              if (step == 0)
+                const Expanded(
+                    child: Center(
+                  child: Text("Click the camera icon to take a screenshot"),
+                ))
+              else if (step == 1)
+                const Expanded(
+                    child: Center(
+                        child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Button(
-                      child: const Padding(
-                        padding: EdgeInsets.all(8.0),
-                        child: Icon(FluentIcons.camera),
-                      ),
-                      onPressed: _onTakeScreen,
-                    )
+                    ProgressRing(),
+                    SizedBox(height: 6),
+                    Text("Processing...")
                   ],
-                ),
-              ),
+                )))
+              else if (avifData != null && step == 2)
+                Expanded(child: Center(child: Image.memory(avifData!))),
             ],
           ),
           automaticallyImplyLeading: false,
@@ -142,7 +181,28 @@ class _MainAppUIState extends ConsumerState<MainAppUI>
 
   _onTakeScreen() async {
     await windowManager.minimize();
-    final r = await takeFullScreen().toList();
+    await Future.delayed(const Duration(milliseconds: 200));
+    final r = (await takeFullScreen().toList()).firstOrNull;
+    if (r == null) return;
+    setState(() {
+      step = 1;
+    });
     await windowManager.restore();
+    final avifData = await r.toAvif();
+    setState(() {
+      this.avifData = avifData;
+      step = 2;
+    });
+  }
+
+  void _onSave() async {
+    final name = "shot_HDR_${DateTime.now().millisecondsSinceEpoch}.avif";
+    final path = await FilePicker.platform.saveFile(
+        dialogTitle: "Save screenshot", fileName: name, lockParentWindow: true);
+    if (path != null) {
+      final f = File(path);
+      await f.create(recursive: true);
+      await f.writeAsBytes(avifData!);
+    }
   }
 }

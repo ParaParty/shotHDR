@@ -1,4 +1,3 @@
-use std::cmp::max;
 use glam::f32::{Mat3, Vec3};
 use half::prelude::*;
 use libavif_sys::*;
@@ -13,14 +12,14 @@ struct RGBA {
     a: u16,
 }
 
-pub fn linear_to_pq(linear: f32) -> f32 {
+fn linear_to_pq(linear: f32) -> f32 {
     let pow_linear = linear.powf(0.1593017578125f32);
     let num = 0.1640625f32 * pow_linear - 0.1640625f32;
     let den = 1.0f32 + 18.6875f32 * pow_linear;
     (1.0f32 + num / den).powf(78.84375f32)
 }
 
-pub fn float_to_unorm(f: &[f32]) -> (RGBA, u16) {
+fn float_to_unorm(f: &[f32]) -> (RGBA, u16) {
     let sc_rgb = Vec3::new(f[0], f[1], f[2]);
 
     const REC2100_MAX: f32 = 10000.0;

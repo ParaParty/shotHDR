@@ -31,7 +31,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueNom,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.0.0-dev.33";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 217016225;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -48778484;
 
 // Section: executor
 
@@ -39,6 +39,26 @@ flutter_rust_bridge::frb_generated_default_handler!();
 
 // Section: wire_funcs
 
+fn wire_capture_result_to_avif_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    that: impl CstDecode<crate::api::screen_shot_api::CaptureResult>,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::DcoCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "capture_result_to_avif",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let api_that = that.cst_decode();
+            move |context| {
+                transform_result_dco((move || {
+                    crate::api::screen_shot_api::CaptureResult::to_avif(&api_that)
+                })())
+            }
+        },
+    )
+}
 fn wire_take_full_screen_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     stream_sink: impl CstDecode<
@@ -48,7 +68,7 @@ fn wire_take_full_screen_impl(
         >,
     >,
 ) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::DcoCodec, _, _, _>(
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::DcoCodec, _, _>(
         flutter_rust_bridge::for_generated::TaskInfo {
             debug_name: "take_full_screen",
             port: Some(port_),
@@ -56,13 +76,10 @@ fn wire_take_full_screen_impl(
         },
         move || {
             let api_stream_sink = stream_sink.cst_decode();
-            move |context| async move {
-                transform_result_dco(
-                    (move || async move {
-                        crate::api::screen_shot_api::take_full_screen(api_stream_sink).await
-                    })()
-                    .await,
-                )
+            move |context| {
+                transform_result_dco((move || {
+                    crate::api::screen_shot_api::take_full_screen(api_stream_sink)
+                })())
             }
         },
     )
@@ -130,14 +147,12 @@ impl SseDecode for crate::api::screen_shot_api::CaptureResult {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_mode = <String>::sse_decode(deserializer);
-        let mut var_avifData = <Vec<u8>>::sse_decode(deserializer);
-        let mut var_pngData = <Vec<u8>>::sse_decode(deserializer);
+        let mut var_rawData = <Vec<u8>>::sse_decode(deserializer);
         let mut var_frameWidth = <u32>::sse_decode(deserializer);
         let mut var_frameHeight = <u32>::sse_decode(deserializer);
         return crate::api::screen_shot_api::CaptureResult {
             mode: var_mode,
-            avif_data: var_avifData,
-            png_data: var_pngData,
+            raw_data: var_rawData,
             frame_width: var_frameWidth,
             frame_height: var_frameHeight,
         };
@@ -221,8 +236,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::screen_shot_api::CaptureResul
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
             self.mode.into_into_dart().into_dart(),
-            self.avif_data.into_into_dart().into_dart(),
-            self.png_data.into_into_dart().into_dart(),
+            self.raw_data.into_into_dart().into_dart(),
             self.frame_width.into_into_dart().into_dart(),
             self.frame_height.into_into_dart().into_dart(),
         ]
@@ -271,8 +285,7 @@ impl SseEncode for crate::api::screen_shot_api::CaptureResult {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.mode, serializer);
-        <Vec<u8>>::sse_encode(self.avif_data, serializer);
-        <Vec<u8>>::sse_encode(self.png_data, serializer);
+        <Vec<u8>>::sse_encode(self.raw_data, serializer);
         <u32>::sse_encode(self.frame_width, serializer);
         <u32>::sse_encode(self.frame_height, serializer);
     }

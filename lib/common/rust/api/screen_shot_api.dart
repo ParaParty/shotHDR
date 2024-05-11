@@ -14,24 +14,24 @@ Stream<CaptureResult> takeFullScreen({dynamic hint}) =>
 
 class CaptureResult {
   final String mode;
-  final Uint8List avifData;
-  final Uint8List pngData;
+  final Uint8List rawData;
   final int frameWidth;
   final int frameHeight;
 
   const CaptureResult({
     required this.mode,
-    required this.avifData,
-    required this.pngData,
+    required this.rawData,
     required this.frameWidth,
     required this.frameHeight,
   });
 
+  Future<Uint8List> toAvif({dynamic hint}) =>
+      RustLib.instance.api.captureResultToAvif(that: this, hint: hint);
+
   @override
   int get hashCode =>
       mode.hashCode ^
-      avifData.hashCode ^
-      pngData.hashCode ^
+      rawData.hashCode ^
       frameWidth.hashCode ^
       frameHeight.hashCode;
 
@@ -41,8 +41,7 @@ class CaptureResult {
       other is CaptureResult &&
           runtimeType == other.runtimeType &&
           mode == other.mode &&
-          avifData == other.avifData &&
-          pngData == other.pngData &&
+          rawData == other.rawData &&
           frameWidth == other.frameWidth &&
           frameHeight == other.frameHeight;
 }

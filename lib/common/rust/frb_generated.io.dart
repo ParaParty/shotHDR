@@ -30,6 +30,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String dco_decode_String(dynamic raw);
 
   @protected
+  CaptureResult dco_decode_box_autoadd_capture_result(dynamic raw);
+
+  @protected
   CaptureResult dco_decode_capture_result(dynamic raw);
 
   @protected
@@ -53,6 +56,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   String sse_decode_String(SseDeserializer deserializer);
+
+  @protected
+  CaptureResult sse_decode_box_autoadd_capture_result(
+      SseDeserializer deserializer);
 
   @protected
   CaptureResult sse_decode_capture_result(SseDeserializer deserializer);
@@ -100,6 +107,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   }
 
   @protected
+  ffi.Pointer<wire_cst_capture_result> cst_encode_box_autoadd_capture_result(
+      CaptureResult raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    final ptr = wire.cst_new_box_autoadd_capture_result();
+    cst_api_fill_to_wire_capture_result(raw, ptr.ref);
+    return ptr;
+  }
+
+  @protected
   ffi.Pointer<wire_cst_list_prim_u_8_strict> cst_encode_list_prim_u_8_strict(
       Uint8List raw) {
     // Codec=Cst (C-struct based), see doc to use other codecs
@@ -109,11 +125,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   }
 
   @protected
+  void cst_api_fill_to_wire_box_autoadd_capture_result(
+      CaptureResult apiObj, ffi.Pointer<wire_cst_capture_result> wireObj) {
+    cst_api_fill_to_wire_capture_result(apiObj, wireObj.ref);
+  }
+
+  @protected
   void cst_api_fill_to_wire_capture_result(
       CaptureResult apiObj, wire_cst_capture_result wireObj) {
     wireObj.mode = cst_encode_String(apiObj.mode);
-    wireObj.avif_data = cst_encode_list_prim_u_8_strict(apiObj.avifData);
-    wireObj.png_data = cst_encode_list_prim_u_8_strict(apiObj.pngData);
+    wireObj.raw_data = cst_encode_list_prim_u_8_strict(apiObj.rawData);
     wireObj.frame_width = cst_encode_u_32(apiObj.frameWidth);
     wireObj.frame_height = cst_encode_u_32(apiObj.frameHeight);
   }
@@ -137,6 +158,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_String(String self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_capture_result(
+      CaptureResult self, SseSerializer serializer);
 
   @protected
   void sse_encode_capture_result(CaptureResult self, SseSerializer serializer);
@@ -202,6 +227,24 @@ class RustLibWire implements BaseWire {
   late final _store_dart_post_cobject = _store_dart_post_cobjectPtr
       .asFunction<void Function(DartPostCObjectFnType)>();
 
+  void wire_capture_result_to_avif(
+    int port_,
+    ffi.Pointer<wire_cst_capture_result> that,
+  ) {
+    return _wire_capture_result_to_avif(
+      port_,
+      that,
+    );
+  }
+
+  late final _wire_capture_result_to_avifPtr = _lookup<
+          ffi.NativeFunction<
+              ffi.Void Function(
+                  ffi.Int64, ffi.Pointer<wire_cst_capture_result>)>>(
+      'frbgen_shot_hdr_wire_capture_result_to_avif');
+  late final _wire_capture_result_to_avif = _wire_capture_result_to_avifPtr
+      .asFunction<void Function(int, ffi.Pointer<wire_cst_capture_result>)>();
+
   void wire_take_full_screen(
     int port_,
     ffi.Pointer<wire_cst_list_prim_u_8_strict> stream_sink,
@@ -233,6 +276,17 @@ class RustLibWire implements BaseWire {
           'frbgen_shot_hdr_wire_init_app');
   late final _wire_init_app =
       _wire_init_appPtr.asFunction<void Function(int)>();
+
+  ffi.Pointer<wire_cst_capture_result> cst_new_box_autoadd_capture_result() {
+    return _cst_new_box_autoadd_capture_result();
+  }
+
+  late final _cst_new_box_autoadd_capture_resultPtr = _lookup<
+          ffi.NativeFunction<ffi.Pointer<wire_cst_capture_result> Function()>>(
+      'frbgen_shot_hdr_cst_new_box_autoadd_capture_result');
+  late final _cst_new_box_autoadd_capture_result =
+      _cst_new_box_autoadd_capture_resultPtr
+          .asFunction<ffi.Pointer<wire_cst_capture_result> Function()>();
 
   ffi.Pointer<wire_cst_list_prim_u_8_strict> cst_new_list_prim_u_8_strict(
     int len,
@@ -279,9 +333,7 @@ final class wire_cst_list_prim_u_8_strict extends ffi.Struct {
 final class wire_cst_capture_result extends ffi.Struct {
   external ffi.Pointer<wire_cst_list_prim_u_8_strict> mode;
 
-  external ffi.Pointer<wire_cst_list_prim_u_8_strict> avif_data;
-
-  external ffi.Pointer<wire_cst_list_prim_u_8_strict> png_data;
+  external ffi.Pointer<wire_cst_list_prim_u_8_strict> raw_data;
 
   @ffi.Uint32()
   external int frame_width;

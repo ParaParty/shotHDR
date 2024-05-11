@@ -57,7 +57,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.0.0-dev.33';
 
   @override
-  int get rustContentHash => 217016225;
+  int get rustContentHash => -48778484;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -68,6 +68,9 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 }
 
 abstract class RustLibApi extends BaseApi {
+  Future<Uint8List> captureResultToAvif(
+      {required CaptureResult that, dynamic hint});
+
   Stream<CaptureResult> takeFullScreen({dynamic hint});
 
   Future<void> initApp({dynamic hint});
@@ -80,6 +83,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required super.generalizedFrbRustBinding,
     required super.portManager,
   });
+
+  @override
+  Future<Uint8List> captureResultToAvif(
+      {required CaptureResult that, dynamic hint}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        var arg0 = cst_encode_box_autoadd_capture_result(that);
+        return wire.wire_capture_result_to_avif(port_, arg0);
+      },
+      codec: DcoCodec(
+        decodeSuccessData: dco_decode_list_prim_u_8_strict,
+        decodeErrorData: dco_decode_AnyhowException,
+      ),
+      constMeta: kCaptureResultToAvifConstMeta,
+      argValues: [that],
+      apiImpl: this,
+      hint: hint,
+    ));
+  }
+
+  TaskConstMeta get kCaptureResultToAvifConstMeta => const TaskConstMeta(
+        debugName: "capture_result_to_avif",
+        argNames: ["that"],
+      );
 
   @override
   Stream<CaptureResult> takeFullScreen({dynamic hint}) {
@@ -148,17 +175,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  CaptureResult dco_decode_box_autoadd_capture_result(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_capture_result(raw);
+  }
+
+  @protected
   CaptureResult dco_decode_capture_result(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 5)
-      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
     return CaptureResult(
       mode: dco_decode_String(arr[0]),
-      avifData: dco_decode_list_prim_u_8_strict(arr[1]),
-      pngData: dco_decode_list_prim_u_8_strict(arr[2]),
-      frameWidth: dco_decode_u_32(arr[3]),
-      frameHeight: dco_decode_u_32(arr[4]),
+      rawData: dco_decode_list_prim_u_8_strict(arr[1]),
+      frameWidth: dco_decode_u_32(arr[2]),
+      frameHeight: dco_decode_u_32(arr[3]),
     );
   }
 
@@ -208,17 +240,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  CaptureResult sse_decode_box_autoadd_capture_result(
+      SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_capture_result(deserializer));
+  }
+
+  @protected
   CaptureResult sse_decode_capture_result(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_mode = sse_decode_String(deserializer);
-    var var_avifData = sse_decode_list_prim_u_8_strict(deserializer);
-    var var_pngData = sse_decode_list_prim_u_8_strict(deserializer);
+    var var_rawData = sse_decode_list_prim_u_8_strict(deserializer);
     var var_frameWidth = sse_decode_u_32(deserializer);
     var var_frameHeight = sse_decode_u_32(deserializer);
     return CaptureResult(
         mode: var_mode,
-        avifData: var_avifData,
-        pngData: var_pngData,
+        rawData: var_rawData,
         frameWidth: var_frameWidth,
         frameHeight: var_frameHeight);
   }
@@ -303,11 +340,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_capture_result(
+      CaptureResult self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_capture_result(self, serializer);
+  }
+
+  @protected
   void sse_encode_capture_result(CaptureResult self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.mode, serializer);
-    sse_encode_list_prim_u_8_strict(self.avifData, serializer);
-    sse_encode_list_prim_u_8_strict(self.pngData, serializer);
+    sse_encode_list_prim_u_8_strict(self.rawData, serializer);
     sse_encode_u_32(self.frameWidth, serializer);
     sse_encode_u_32(self.frameHeight, serializer);
   }
