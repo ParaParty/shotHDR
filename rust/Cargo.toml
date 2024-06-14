@@ -7,13 +7,13 @@ edition = "2021"
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
-flutter_rust_bridge = "=2.0.0-dev.33"
-windows-capture = { path = "../packages/windows-capture" }
+flutter_rust_bridge = "=2.0.0-dev.39"
+windows-capture = "1.2.0"
 anyhow = "1.0"
 half = "2.4.1"
-glam = "0.27.0"
+glam = "0.28.0"
 libavif-sys = { version = "0.16.0", default-features = false, features = ["codec-aom"] }
-windows = { version = "0.56.0", features = ["Win32_Graphics_Dxgi_Common", "Win32_Graphics_Gdi"] }
+windows = { version = "0.57.0", features = ["Win32_Graphics_Dxgi_Common", "Win32_Graphics_Gdi"] }
 
 [profile.dev.package.libaom-sys]
 opt-level = 3

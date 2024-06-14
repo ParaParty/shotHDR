@@ -2,11 +2,6 @@ use std::io;
 use std::io::Write;
 use std::sync::Arc;
 
-use anyhow::anyhow;
-use half::f16;
-use libavif_sys::{AVIF_CHROMA_SAMPLE_POSITION_UNKNOWN, AVIF_FALSE, AVIF_PIXEL_FORMAT_YUV420, AVIF_RANGE_FULL, AVIF_RANGE_LIMITED, AVIF_RESULT_OK, avifBool, avifEncoderCreate, avifEncoderWrite, avifImage, avifRWData, avifRWDataFree};
-use windows::Win32::Graphics::Dxgi;
-
 use windows_capture::capture::GraphicsCaptureApiHandler;
 use windows_capture::frame::Frame;
 use windows_capture::graphics_capture_api::InternalCaptureControl;
@@ -34,7 +29,7 @@ pub struct CaptureResult {
 
 impl CaptureResult {
     pub fn to_avif(&self) -> anyhow::Result<Vec<u8>> {
-        _raw_buffer_to_avif(self.raw_data.clone(), self.frame_width, self.frame_height)
+        colorist::raw_buffer_to_avif(self.raw_data.clone(), self.frame_width, self.frame_height)
     }
 }
 
@@ -97,42 +92,4 @@ pub fn take_full_screen(stream_sink: StreamSink<CaptureResult>) -> anyhow::Resul
     );
     Capture::start(settings).expect("Screen Capture Failed");
     Ok(())
-}
-
-fn _raw_buffer_to_avif(buf: Vec<u8>, frame_width: u32, frame_height: u32) -> anyhow::Result<Vec<u8>> {
-    let data: Vec<f16> = buf.chunks_exact(2).map(|chunk| {
-        let mut bytes_array = [0u8; 2];
-        bytes_array.copy_from_slice(chunk);
-        f16::from_le_bytes(bytes_array)
-    }).collect();
-    let display_desc = Dxgi::DXGI_OUTPUT_DESC1::default();
-    let mut avif = avifImage::default();
-    avif.width = frame_width;
-    avif.height = frame_height;
-    avif.depth = 10;
-    avif.yuvFormat = AVIF_PIXEL_FORMAT_YUV420;
-    avif.yuvRange = AVIF_RANGE_FULL;
-    avif.yuvChromaSamplePosition = AVIF_CHROMA_SAMPLE_POSITION_UNKNOWN;
-    avif.alphaPremultiplied = AVIF_FALSE as avifBool;
-    let result = colorist::fill_avif_image(data, &display_desc, false, &mut avif);
-    if result != AVIF_RESULT_OK {
-        return Err(anyhow!("fill_avif_image failed: {}", result));
-    }
-    assert_eq!(result, AVIF_RESULT_OK);
-    let avif_vec = unsafe {
-        let encoder = avifEncoderCreate();
-        (*encoder).speed = 12;
-        (*encoder).quality = 100;
-        (*encoder).maxThreads = 16;
-        (*encoder).tileColsLog2 = 1;
-        (*encoder).tileRowsLog2 = 1;
-        let mut output = avifRWData::default();
-        let output_c = &mut output as *mut avifRWData;
-        let result = avifEncoderWrite(encoder, &avif, output_c);
-        assert_eq!(result, AVIF_RESULT_OK);
-        let data = std::slice::from_raw_parts(output.data, output.size).to_vec();
-        avifRWDataFree(output_c);
-        data
-    };
-    return Ok(avif_vec);
 }

@@ -1,7 +1,9 @@
+use anyhow::anyhow;
 use glam::f32::{Mat3, Vec3};
 use half::prelude::*;
 use libavif_sys::*;
 use windows::Win32::Graphics::Dxgi;
+use crate::colorist;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -70,7 +72,7 @@ pub fn fill_avif_image(data: Vec<f16>, display: &Dxgi::DXGI_OUTPUT_DESC1, alpha:
     let mut f32_buf = vec![0.0; data.len()];
     data.convert_to_f32_slice(&mut f32_buf);
 
-    let (mut u16_buf, brightness) : (Vec<RGBA>, Vec<u16>) = f32_buf.chunks_exact(4).map(float_to_unorm).unzip();
+    let (mut u16_buf, brightness): (Vec<RGBA>, Vec<u16>) = f32_buf.chunks_exact(4).map(float_to_unorm).unzip();
     let max_cll = *brightness.iter().max().unwrap();
     let sum: u64 = brightness.iter().map(|x| *x as u64).sum();
     let pall = ((sum as f64) / (num_pixel as f64)).round() as u16;
@@ -109,4 +111,42 @@ pub fn fill_avif_image(data: Vec<f16>, display: &Dxgi::DXGI_OUTPUT_DESC1, alpha:
         }
         avifImageRGBToYUV(avif, &rgb)
     }
+}
+
+pub fn raw_buffer_to_avif(buf: Vec<u8>, frame_width: u32, frame_height: u32) -> anyhow::Result<Vec<u8>> {
+    let data: Vec<f16> = buf.chunks_exact(2).map(|chunk| {
+        let mut bytes_array = [0u8; 2];
+        bytes_array.copy_from_slice(chunk);
+        f16::from_le_bytes(bytes_array)
+    }).collect();
+    let display_desc = Dxgi::DXGI_OUTPUT_DESC1::default();
+    let mut avif = avifImage::default();
+    avif.width = frame_width;
+    avif.height = frame_height;
+    avif.depth = 10;
+    avif.yuvFormat = AVIF_PIXEL_FORMAT_YUV420;
+    avif.yuvRange = AVIF_RANGE_FULL;
+    avif.yuvChromaSamplePosition = AVIF_CHROMA_SAMPLE_POSITION_UNKNOWN;
+    avif.alphaPremultiplied = AVIF_FALSE as avifBool;
+    let result = colorist::fill_avif_image(data, &display_desc, false, &mut avif);
+    if result != AVIF_RESULT_OK {
+        return Err(anyhow!("fill_avif_image failed: {}", result));
+    }
+    assert_eq!(result, AVIF_RESULT_OK);
+    let avif_vec = unsafe {
+        let encoder = avifEncoderCreate();
+        (*encoder).speed = 12;
+        (*encoder).quality = 100;
+        (*encoder).maxThreads = 16;
+        (*encoder).tileColsLog2 = 1;
+        (*encoder).tileRowsLog2 = 1;
+        let mut output = avifRWData::default();
+        let output_c = &mut output as *mut avifRWData;
+        let result = avifEncoderWrite(encoder, &avif, output_c);
+        assert_eq!(result, AVIF_RESULT_OK);
+        let data = std::slice::from_raw_parts(output.data, output.size).to_vec();
+        avifRWDataFree(output_c);
+        data
+    };
+    return Ok(avif_vec);
 }
