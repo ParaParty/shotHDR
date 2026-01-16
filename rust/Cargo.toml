@@ -6,15 +6,34 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib", "staticlib"]
 
-[dependencies]
-flutter_rust_bridge = "=2.0.0-dev.39"
-windows-capture = "1.2.0"
-anyhow = "1.0"
-half = "2.4.1"
-glam = "0.28.0"
-libavif-sys = { version = "0.16.0", default-features = false, features = ["codec-aom"] }
-windows = { version = "0.57.0", features = ["Win32_Graphics_Dxgi_Common", "Win32_Graphics_Gdi"] }
+# Suppress frb_expand warning from flutter_rust_bridge macro
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(frb_expand)"] }
 
-[profile.dev.package.libaom-sys]
-opt-level = 3
-debug = "none"
+[dependencies]
+flutter_rust_bridge = "=2.11.1"
+anyhow = "1.0"
+half = "2"
+glam = "0"
+
+# Ultra HDR JPEG encoding (cross-platform)
+ultrahdr = { version = "0.1", features = ["vendored"] }
+
+# Windows specific dependencies
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-capture = "1.5.0"
+windows = { version = "0.61", features = [
+    "Win32_Graphics_Dxgi_Common",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+# macOS specific dependencies
+[target.'cfg(target_os = "macos")'.dependencies]
+# Enable macos_15_0 feature for HDR capture support (SCCaptureDynamicRange)
+screencapturekit = { version = "1.5.0", features = ["macos_15_0"] }
+core-graphics = "0.23"
+
+# Linux specific dependencies (placeholder)
+[target.'cfg(target_os = "linux")'.dependencies]
+# TODO: add pipewire or xdg-desktop-portal integration

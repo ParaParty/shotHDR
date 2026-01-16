@@ -1,3 +1,4 @@
 pub mod api;
-mod frb_generated;
 pub mod colorist;
+mod frb_generated;
+pub mod screenshot;

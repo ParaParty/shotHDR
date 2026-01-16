@@ -4,7 +4,7 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   flutter_acrylic
-  screen_retriever
+  screen_retriever_windows
   tray_manager
   window_manager
 )

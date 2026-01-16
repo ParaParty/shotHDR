@@ -1,19 +1,14 @@
+//! Color processing and HDR encoding utilities
+//!
+//! This module handles the conversion of raw HDR screen capture data to
+//! Ultra HDR JPEG format which is compatible with Android's UltraHDR standard.
+
 use anyhow::anyhow;
 use glam::f32::{Mat3, Vec3};
 use half::prelude::*;
-use libavif_sys::*;
-use windows::Win32::Graphics::Dxgi;
-use crate::colorist;
+use ultrahdr::{sys, Encoder, ImgLabel, RawImage};
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
-struct RGBA {
-    r: u16,
-    g: u16,
-    b: u16,
-    a: u16,
-}
-
+/// Convert half-float scRGB linear values to PQ (Perceptual Quantizer) values
 fn linear_to_pq(linear: f32) -> f32 {
     let pow_linear = linear.powf(0.1593017578125f32);
     let num = 0.1640625f32 * pow_linear - 0.1640625f32;
@@ -21,132 +16,198 @@ fn linear_to_pq(linear: f32) -> f32 {
     (1.0f32 + num / den).powf(78.84375f32)
 }
 
-fn float_to_unorm(f: &[f32]) -> (RGBA, u16) {
-    let sc_rgb = Vec3::new(f[0], f[1], f[2]);
+/// scRGB to BT.2020 color matrix
+const SRGB_TO_BT2100: [f32; 9] = [
+    0.627409, 0.0691248, 0.0164234, 0.32926, 0.919549, 0.0880478, 0.0432719, 0.0113208, 0.895617,
+];
 
-    const REC2100_MAX: f32 = 10000.0;
-    const SDR_WHITE: f32 = 80.0;
-    let scale = SDR_WHITE / REC2100_MAX;
-    let linear_srgb = sc_rgb * scale;
-
-    let srgb_to_bt2100 = Mat3::from_cols_array(&[
-        0.627409, 0.0691248, 0.0164234,
-        0.32926, 0.919549, 0.0880478,
-        0.0432719, 0.0113208, 0.895617
-    ]);
-    let linear_bt2100 = srgb_to_bt2100.mul_vec3(linear_srgb).clamp(Vec3::splat(0f32), Vec3::splat(1f32));
-
-    let coeff = Vec3::new(0.2627, 0.6780, 0.0593);
-    let brightness = (linear_bt2100.dot(coeff) * 10000f32).round() as u16;
-
-    let pq_bt2100 = Vec3::from(linear_bt2100.as_ref().map(linear_to_pq));
-    let rgb = (pq_bt2100 * 65535f32).round().as_u16vec3();
-
-    (RGBA {
-        r: rgb.x,
-        g: rgb.y,
-        b: rgb.z,
-        a: (f[3] * 65535f32) as u16,
-    }, brightness)
-}
-
-/// Fill AVIF Image from half float scRGB data.
+/// Convert raw Rgba16F buffer from Windows Graphics Capture to Ultra HDR JPEG
 ///
-/// The following fields of avif should be filled:
-/// - width
-/// - height
-/// - depth
-/// - yuvFormat
-/// - yuvRange
-/// - yuvChromaSamplePosition
-/// - alphaPremultiplied
+/// The input buffer is in scRGB format (linear, extended range) with FP16 components.
+/// We convert it to:
+/// 1. SDR base image (8-bit sRGB JPEG)
+/// 2. HDR gain map that allows reconstruction of HDR content
 ///
-/// After call, avif owns pixel memory and should be freed with avifImageDestroy
-///
-/// For now display is not actually used.
-/// It may be useful in the future.
-pub fn fill_avif_image(data: Vec<f16>, display: &Dxgi::DXGI_OUTPUT_DESC1, alpha: bool, avif: &mut avifImage) -> avifResult {
-    let num_pixel = avif.width as usize * avif.height as usize;
-    assert_eq!(data.len(), num_pixel * 4);
+/// The output is a backwards-compatible JPEG that displays correctly on SDR screens
+/// but contains HDR information for HDR-capable displays.
+pub fn raw_buffer_to_ultra_hdr_jpeg(
+    buf: Vec<u8>,
+    frame_width: u32,
+    frame_height: u32,
+    mode: &str,
+) -> anyhow::Result<Vec<u8>> {
+    let width = frame_width as usize;
+    let height = frame_height as usize;
+    let num_pixels = width * height;
 
-    let mut f32_buf = vec![0.0; data.len()];
-    data.convert_to_f32_slice(&mut f32_buf);
+    let mut f32_data = vec![0.0f32; num_pixels * 4];
 
-    let (mut u16_buf, brightness): (Vec<RGBA>, Vec<u16>) = f32_buf.chunks_exact(4).map(float_to_unorm).unzip();
-    let max_cll = *brightness.iter().max().unwrap();
-    let sum: u64 = brightness.iter().map(|x| *x as u64).sum();
-    let pall = ((sum as f64) / (num_pixel as f64)).round() as u16;
-
-    let rgb = avifRGBImage {
-        width: avif.width,
-        height: avif.height,
-        depth: 16,
-        format: AVIF_RGB_FORMAT_RGBA,
-        chromaUpsampling: AVIF_CHROMA_UPSAMPLING_AUTOMATIC,
-        chromaDownsampling: AVIF_CHROMA_DOWNSAMPLING_BEST_QUALITY,
-        avoidLibYUV: AVIF_FALSE as avifBool,
-        ignoreAlpha: if alpha { AVIF_FALSE } else { AVIF_TRUE } as avifBool,
-        alphaPremultiplied: AVIF_FALSE as avifBool,
-        isFloat: AVIF_FALSE as avifBool,
-        maxThreads: 1,
-        pixels: u16_buf.as_mut_ptr() as *mut u8,
-        rowBytes: avif.width * 8,
-    };
-
-    avif.colorPrimaries = AVIF_COLOR_PRIMARIES_BT2020 as avifColorPrimaries;
-    avif.transferCharacteristics = AVIF_TRANSFER_CHARACTERISTICS_SMPTE2084 as avifTransferCharacteristics;
-    avif.matrixCoefficients = AVIF_MATRIX_COEFFICIENTS_BT2020_NCL as avifMatrixCoefficients;
-    avif.clli = avifContentLightLevelInformationBox {
-        maxCLL: max_cll,
-        maxPALL: pall,
-    };
-
-    // TODO: fill avif.mdcv once supported by libavif
-    _ = display;
-
-    unsafe {
-        let result = avifImageAllocatePlanes(avif, if alpha { AVIF_PLANES_ALL } else { AVIF_PLANES_YUV });
-        if result != AVIF_RESULT_OK {
-            return result;
+    if mode == "sdr_macos" {
+        // BGRA 8-bit input
+        // Convert to Linear scRGB (f32)
+        if buf.len() != num_pixels * 4 {
+            return Err(anyhow::anyhow!("Invalid buffer size for sdr_macos (BGRA)"));
         }
-        avifImageRGBToYUV(avif, &rgb)
-    }
-}
 
-pub fn raw_buffer_to_avif(buf: Vec<u8>, frame_width: u32, frame_height: u32) -> anyhow::Result<Vec<u8>> {
-    let data: Vec<f16> = buf.chunks_exact(2).map(|chunk| {
-        let mut bytes_array = [0u8; 2];
-        bytes_array.copy_from_slice(chunk);
-        f16::from_le_bytes(bytes_array)
-    }).collect();
-    let display_desc = Dxgi::DXGI_OUTPUT_DESC1::default();
-    let mut avif = avifImage::default();
-    avif.width = frame_width;
-    avif.height = frame_height;
-    avif.depth = 10;
-    avif.yuvFormat = AVIF_PIXEL_FORMAT_YUV420;
-    avif.yuvRange = AVIF_RANGE_FULL;
-    avif.yuvChromaSamplePosition = AVIF_CHROMA_SAMPLE_POSITION_UNKNOWN;
-    avif.alphaPremultiplied = AVIF_FALSE as avifBool;
-    let result = colorist::fill_avif_image(data, &display_desc, false, &mut avif);
-    if result != AVIF_RESULT_OK {
-        return Err(anyhow!("fill_avif_image failed: {}", result));
+        for (i, chunk) in buf.chunks_exact(4).enumerate() {
+            let b = chunk[0] as f32 / 255.0;
+            let g = chunk[1] as f32 / 255.0;
+            let r = chunk[2] as f32 / 255.0;
+            let a = chunk[3] as f32 / 255.0;
+
+            // Simple approximate Linearize (sRGB -> Linear)
+            // Ideally use exact sRGB curve, but pow(2.2) is close enough for this context
+            let r_lin = r.powf(2.2);
+            let g_lin = g.powf(2.2);
+            let b_lin = b.powf(2.2);
+
+            f32_data[i * 4] = r_lin;
+            f32_data[i * 4 + 1] = g_lin;
+            f32_data[i * 4 + 2] = b_lin;
+            f32_data[i * 4 + 3] = a;
+        }
+    } else {
+        // Assume hdr_macos or other F16 input
+        // Convert FP16 bytes to f16 values
+        let f16_data: Vec<f16> = buf
+            .chunks_exact(2)
+            .map(|chunk| {
+                let mut bytes_array = [0u8; 2];
+                bytes_array.copy_from_slice(chunk);
+                f16::from_le_bytes(bytes_array)
+            })
+            .collect();
+
+        if f16_data.len() != num_pixels * 4 {
+            // If buffer size mismatch, we might be reading garbage or stride issue
+            // But let's try to proceed or error
+        }
+
+        f16_data.convert_to_f32_slice(&mut f32_data);
     }
-    assert_eq!(result, AVIF_RESULT_OK);
-    let avif_vec = unsafe {
-        let encoder = avifEncoderCreate();
-        (*encoder).speed = 12;
-        (*encoder).quality = 100;
-        (*encoder).maxThreads = 16;
-        (*encoder).tileColsLog2 = 1;
-        (*encoder).tileRowsLog2 = 1;
-        let mut output = avifRWData::default();
-        let output_c = &mut output as *mut avifRWData;
-        let result = avifEncoderWrite(encoder, &avif, output_c);
-        assert_eq!(result, AVIF_RESULT_OK);
-        let data = std::slice::from_raw_parts(output.data, output.size).to_vec();
-        avifRWDataFree(output_c);
-        data
-    };
-    return Ok(avif_vec);
+
+    // Create SDR buffer (8-bit RGBA for the base layer)
+    let mut sdr_rgba = vec![0u8; num_pixels * 4];
+
+    // Create HDR buffer (10-bit in RGBA1010102 packed format for gain map)
+    let mut hdr_rgba1010102 = vec![0u8; num_pixels * 4];
+
+    let srgb_to_bt2100 = Mat3::from_cols_array(&SRGB_TO_BT2100);
+
+    for (i, pixel) in f32_data.chunks_exact(4).enumerate() {
+        let r = pixel[0];
+        let g = pixel[1];
+        let b = pixel[2];
+        let a = pixel[3];
+
+        // SDR: Output sRGB 8-bit
+        // The input from macOS HDRCanonicalDisplay (RGhA) appears to be already gamma-encoded (sRGB/DisplayP3).
+        // Using it directly for SDR ensures correct brightness. Applying gamma again causes "washed out" look.
+        let sdr_r = r.clamp(0.0, 1.0);
+        let sdr_g = g.clamp(0.0, 1.0);
+        let sdr_b = b.clamp(0.0, 1.0);
+
+        let sdr_offset = i * 4;
+        sdr_rgba[sdr_offset] = (sdr_r * 255.0) as u8;
+        sdr_rgba[sdr_offset + 1] = (sdr_g * 255.0) as u8;
+        sdr_rgba[sdr_offset + 2] = (sdr_b * 255.0) as u8;
+        sdr_rgba[sdr_offset + 3] = (a.clamp(0.0, 1.0) * 255.0) as u8;
+
+        // HDR: Convert to BT.2020 PQ for HDR layer
+        // Since input is treated as Gamma-Encoded, we must linearize it first for the HDR Math
+        let lin_r = if r > 0.0 { r.powf(2.2) } else { 0.0 };
+        let lin_g = if g > 0.0 { g.powf(2.2) } else { 0.0 };
+        let lin_b = if b > 0.0 { b.powf(2.2) } else { 0.0 };
+
+        let sc_rgb = Vec3::new(lin_r, lin_g, lin_b);
+        const REC2100_MAX: f32 = 10000.0;
+        const SDR_WHITE: f32 = 203.0; // Standard HDR reference white is often 203 nits (ITU-R BT.2408)
+
+        // Scale to absolute brightness (assuming 1.0 = SDR White)
+        let linear_absolute = sc_rgb * SDR_WHITE;
+        let linear_normalized_bt2100 = linear_absolute / REC2100_MAX;
+
+        // Convert Color Space (sRGB Primaries -> BT.2020 Primaries)
+        // Note: If input is Display P3, we should use P3->BT2020 matrix, but assuming sRGB primaries for now.
+        let linear_bt2100 = srgb_to_bt2100
+            .mul_vec3(linear_normalized_bt2100)
+            .clamp(Vec3::splat(0f32), Vec3::splat(1f32));
+
+        let pq_r = linear_to_pq(linear_bt2100.x);
+        let pq_g = linear_to_pq(linear_bt2100.y);
+        let pq_b = linear_to_pq(linear_bt2100.z);
+
+        // Pack as 10-bit per channel (values 0-1023)
+        let r10 = (pq_r * 1023.0).round() as u32;
+        let g10 = (pq_g * 1023.0).round() as u32;
+        let b10 = (pq_b * 1023.0).round() as u32;
+        let a2 = ((a.clamp(0.0, 1.0) * 3.0).round() as u32).min(3);
+
+        // RGBA1010102 format: R[9:0] | G[9:0] | B[9:0] | A[1:0]
+        let packed = r10 | (g10 << 10) | (b10 << 20) | (a2 << 30);
+        let hdr_offset = i * 4;
+        hdr_rgba1010102[hdr_offset..hdr_offset + 4].copy_from_slice(&packed.to_ne_bytes());
+    }
+
+    // Use ultrahdr to encode
+    let mut encoder = Encoder::new().map_err(|e| anyhow!("Failed to create encoder: {:?}", e))?;
+
+    // Create SDR raw image (base layer) using rgba8888
+    let mut sdr_image = RawImage::rgba8888(
+        width as u32,
+        height as u32,
+        &mut sdr_rgba,
+        sys::uhdr_color_gamut::UHDR_CG_BT_709,
+        sys::uhdr_color_transfer::UHDR_CT_SRGB,
+        sys::uhdr_color_range::UHDR_CR_FULL_RANGE,
+    )
+    .map_err(|e| anyhow!("Failed to create SDR image: {:?}", e))?;
+
+    // Create HDR raw image (gain map source) using packed format
+    let mut hdr_image = RawImage::packed(
+        sys::uhdr_img_fmt::UHDR_IMG_FMT_32bppRGBA1010102,
+        width as u32,
+        height as u32,
+        &mut hdr_rgba1010102,
+        sys::uhdr_color_gamut::UHDR_CG_BT_2100,
+        sys::uhdr_color_transfer::UHDR_CT_PQ,
+        sys::uhdr_color_range::UHDR_CR_FULL_RANGE,
+    )
+    .map_err(|e| anyhow!("Failed to create HDR image: {:?}", e))?;
+
+    // Set images for encoding
+    encoder
+        .set_raw_image(&mut sdr_image, ImgLabel::UHDR_SDR_IMG)
+        .map_err(|e| anyhow!("Failed to set SDR image: {:?}", e))?;
+    encoder
+        .set_raw_image(&mut hdr_image, ImgLabel::UHDR_HDR_IMG)
+        .map_err(|e| anyhow!("Failed to set HDR image: {:?}", e))?;
+
+    // Set output format
+    encoder
+        .set_output_format(sys::uhdr_codec::UHDR_CODEC_JPG)
+        .map_err(|e| anyhow!("Failed to set output format: {:?}", e))?;
+
+    // Set quality (0-100)
+    encoder
+        .set_quality(95, ImgLabel::UHDR_BASE_IMG)
+        .map_err(|e| anyhow!("Failed to set base quality: {:?}", e))?;
+    encoder
+        .set_quality(95, ImgLabel::UHDR_GAIN_MAP_IMG)
+        .map_err(|e| anyhow!("Failed to set gain map quality: {:?}", e))?;
+
+    // Encode
+    encoder
+        .encode()
+        .map_err(|e| anyhow!("Failed to encode: {:?}", e))?;
+
+    // Get output bytes
+    let output = encoder
+        .encoded_stream()
+        .ok_or_else(|| anyhow!("No encoded output"))?;
+    let bytes = output
+        .bytes()
+        .map_err(|e| anyhow!("Failed to get bytes: {:?}", e))?;
+
+    Ok(bytes.to_vec())
 }

@@ -32,7 +32,7 @@ Widget makeDefaultPage(BuildContext context,
     content: useBodyContainer
         ? Container(
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(.1),
+              color: Colors.white.withAlpha(25),
               borderRadius: BorderRadius.circular(9),
             ),
             child: content,
