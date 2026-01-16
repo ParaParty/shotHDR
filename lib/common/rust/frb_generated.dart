@@ -70,7 +70,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.11.1';
 
   @override
-  int get rustContentHash => -1871726773;
+  int get rustContentHash => -1345948662;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -81,6 +81,13 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 }
 
 abstract class RustLibApi extends BaseApi {
+  Future<CaptureResult> crateApiScreenShotApiCaptureResultCrop(
+      {required CaptureResult that,
+      required int x,
+      required int y,
+      required int width,
+      required int height});
+
   Future<Uint8List> crateApiScreenShotApiCaptureResultToUltraHdrJpeg(
       {required CaptureResult that});
 
@@ -100,6 +107,39 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required super.generalizedFrbRustBinding,
     required super.portManager,
   });
+
+  @override
+  Future<CaptureResult> crateApiScreenShotApiCaptureResultCrop(
+      {required CaptureResult that,
+      required int x,
+      required int y,
+      required int width,
+      required int height}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        var arg0 = cst_encode_box_autoadd_capture_result(that);
+        var arg1 = cst_encode_u_32(x);
+        var arg2 = cst_encode_u_32(y);
+        var arg3 = cst_encode_u_32(width);
+        var arg4 = cst_encode_u_32(height);
+        return wire.wire__crate__api__screen_shot_api__capture_result_crop(
+            port_, arg0, arg1, arg2, arg3, arg4);
+      },
+      codec: DcoCodec(
+        decodeSuccessData: dco_decode_capture_result,
+        decodeErrorData: dco_decode_AnyhowException,
+      ),
+      constMeta: kCrateApiScreenShotApiCaptureResultCropConstMeta,
+      argValues: [that, x, y, width, height],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiScreenShotApiCaptureResultCropConstMeta =>
+      const TaskConstMeta(
+        debugName: "capture_result_crop",
+        argNames: ["that", "x", "y", "width", "height"],
+      );
 
   @override
   Future<Uint8List> crateApiScreenShotApiCaptureResultToUltraHdrJpeg(

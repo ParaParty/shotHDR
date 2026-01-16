@@ -229,6 +229,48 @@ class RustLibWire implements BaseWire {
   late final _store_dart_post_cobject = _store_dart_post_cobjectPtr
       .asFunction<void Function(DartPostCObjectFnType)>();
 
+  void wire__crate__api__screen_shot_api__capture_result_crop(
+    int port_,
+    ffi.Pointer<wire_cst_capture_result> that,
+    int x,
+    int y,
+    int width,
+    int height,
+  ) {
+    return _wire__crate__api__screen_shot_api__capture_result_crop(
+      port_,
+      that,
+      x,
+      y,
+      width,
+      height,
+    );
+  }
+
+  late final _wire__crate__api__screen_shot_api__capture_result_cropPtr =
+      _lookup<
+          ffi.NativeFunction<
+              ffi.Void Function(
+                ffi.Int64,
+                ffi.Pointer<wire_cst_capture_result>,
+                ffi.Uint32,
+                ffi.Uint32,
+                ffi.Uint32,
+                ffi.Uint32,
+              )>>(
+    'frbgen_shot_hdr_wire__crate__api__screen_shot_api__capture_result_crop',
+  );
+  late final _wire__crate__api__screen_shot_api__capture_result_crop =
+      _wire__crate__api__screen_shot_api__capture_result_cropPtr.asFunction<
+          void Function(
+            int,
+            ffi.Pointer<wire_cst_capture_result>,
+            int,
+            int,
+            int,
+            int,
+          )>();
+
   void wire__crate__api__screen_shot_api__capture_result_to_ultra_hdr_jpeg(
     int port_,
     ffi.Pointer<wire_cst_capture_result> that,

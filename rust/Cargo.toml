@@ -18,6 +18,7 @@ glam = "0"
 
 # Ultra HDR JPEG encoding (cross-platform)
 ultrahdr = { version = "0.1", features = ["vendored"] }
+image = "0.24"
 
 # Windows specific dependencies
 [target.'cfg(target_os = "windows")'.dependencies]

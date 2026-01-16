@@ -37,7 +37,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueNom,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.11.1";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1871726773;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1345948662;
 
 // Section: executor
 
@@ -45,6 +45,39 @@ flutter_rust_bridge::frb_generated_default_handler!();
 
 // Section: wire_funcs
 
+fn wire__crate__api__screen_shot_api__capture_result_crop_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    that: impl CstDecode<crate::api::screen_shot_api::CaptureResult>,
+    x: impl CstDecode<u32>,
+    y: impl CstDecode<u32>,
+    width: impl CstDecode<u32>,
+    height: impl CstDecode<u32>,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::DcoCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "capture_result_crop",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let api_that = that.cst_decode();
+            let api_x = x.cst_decode();
+            let api_y = y.cst_decode();
+            let api_width = width.cst_decode();
+            let api_height = height.cst_decode();
+            move |context| {
+                transform_result_dco::<_, _, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::api::screen_shot_api::CaptureResult::crop(
+                            &api_that, api_x, api_y, api_width, api_height,
+                        )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__screen_shot_api__capture_result_to_ultra_hdr_jpeg_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     that: impl CstDecode<crate::api::screen_shot_api::CaptureResult>,
@@ -496,6 +529,20 @@ mod io {
         fn default() -> Self {
             Self::new_with_null_ptr()
         }
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_shot_hdr_wire__crate__api__screen_shot_api__capture_result_crop(
+        port_: i64,
+        that: *mut wire_cst_capture_result,
+        x: u32,
+        y: u32,
+        width: u32,
+        height: u32,
+    ) {
+        wire__crate__api__screen_shot_api__capture_result_crop_impl(
+            port_, that, x, y, width, height,
+        )
     }
 
     #[unsafe(no_mangle)]

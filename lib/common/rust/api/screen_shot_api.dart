@@ -33,8 +33,15 @@ class CaptureResult {
     required this.frameHeight,
   });
 
-  /// Convert raw HDR buffer to Ultra HDR JPEG format
-  /// This produces a backwards-compatible JPEG with embedded HDR gain map
+  /// Crop the capture result to specific region
+  Future<CaptureResult> crop(
+          {required int x,
+          required int y,
+          required int width,
+          required int height}) =>
+      RustLib.instance.api.crateApiScreenShotApiCaptureResultCrop(
+          that: this, x: x, y: y, width: width, height: height);
+
   Future<Uint8List> toUltraHdrJpeg() =>
       RustLib.instance.api.crateApiScreenShotApiCaptureResultToUltraHdrJpeg(
         that: this,
